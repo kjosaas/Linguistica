@@ -7,14 +7,31 @@
 </head>
 <body>
   <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 2em auto;
+      text-align: center;
+    }
     #dropzone {
-      width: 100%; max-width: 400px;
-      height: 150px; border: 2px dashed #666;
-      display: flex; align-items: center; justify-content: center;
+      width: 100%;
+      max-width: 400px;
+      height: 150px;
+      border: 2px dashed #666;
+      background: #f9f9f9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       margin-bottom: 1em;
       cursor: pointer;
     }
     #dropzone.hover { border-color: #333; }
+    img {
+      margin: 0.5em;
+      border-radius: 4px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    label { display:block; margin-bottom:1em; }
   </style>
 
   <div id="dropzone">Drop folder of JPEGs here<br>or click to browse</div>
@@ -26,13 +43,32 @@
     <input type="range" id="threshold" min="0" max="1" step="0.01" value="0.8">
   </label>
 
-  <h2>German:</h2><div id="german"></div>
-  <h2>Logo:</h2><div id="logo"></div>
+  <label>
+    Language:
+    <select id="language">
+      <option value="fra">French</option>
+      <option value="eng">English</option>
+      <option value="deu" selected>German</option>
+      <option value="spa">Spanish</option>
+      <option value="nno">Norwegian</option>
+    </select>
+  </label>
+
+  <h2 id="langLabel">German:</h2>
+  <div id="languageResults"></div>
+  <h2>Logo:</h2>
+  <div id="logo"></div>
 
   <script>
   // open file picker on click
   const dz = document.getElementById('dropzone');
   const fi = document.getElementById('folderInput');
+  const langSelect = document.getElementById('language');
+  const langLabel  = document.getElementById('langLabel');
+  langSelect.onchange = () => {
+    langLabel.textContent = langSelect.options[langSelect.selectedIndex].text + ':';
+  };
+  langSelect.onchange();
   dz.onclick = () => fi.click();
   fi.onchange = e => handleFiles(e.target.files);
 
@@ -58,9 +94,11 @@
     cv.cvtColor(logoSrc, logoSrc, cv.COLOR_RGBA2GRAY);
 
     window.handleFiles = async files => {
-      const germanDiv = document.getElementById('german');
-      const logoDiv   = document.getElementById('logo');
-      germanDiv.innerHTML = ''; logoDiv.innerHTML = '';
+      const langDiv  = document.getElementById('languageResults');
+      const logoDiv  = document.getElementById('logo');
+      langDiv.innerHTML = '';
+      logoDiv.innerHTML = '';
+      const targetLang = langSelect.value;
       const thresh = parseFloat(slider.value);
 
       for (let f of files) {
@@ -81,7 +119,7 @@
         thumb.src = URL.createObjectURL(f);
         thumb.width = 100;
 
-        if (lang==='deu') germanDiv.appendChild(thumb);
+        if (lang === targetLang) langDiv.appendChild(thumb);
         else if (maxVal >= thresh) logoDiv.appendChild(thumb);
       }
     };
