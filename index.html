@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/franc@6/dist/franc.min.js"></script>
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+</head>
+<body>
+  <style>
+    #dropzone {
+      width: 100%; max-width: 400px;
+      height: 150px; border: 2px dashed #666;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1em;
+      cursor: pointer;
+    }
+    #dropzone.hover { border-color: #333; }
+  </style>
+
+  <div id="dropzone">Drop folder of JPEGs here<br>or click to browse</div>
+  <input type="file" id="folderInput" webkitdirectory multiple accept="image/jpeg" style="display:none">
+
+  <label>
+    Logo threshold:
+    <span id="thresholdValue">0.80</span>
+    <input type="range" id="threshold" min="0" max="1" step="0.01" value="0.8">
+  </label>
+
+  <h2>German:</h2><div id="german"></div>
+  <h2>Logo:</h2><div id="logo"></div>
+
+  <script>
+  // open file picker on click
+  const dz = document.getElementById('dropzone');
+  const fi = document.getElementById('folderInput');
+  dz.onclick = () => fi.click();
+  fi.onchange = e => handleFiles(e.target.files);
+
+  // drag/drop handlers
+  dz.addEventListener('dragover', e => {
+    e.preventDefault(); dz.classList.add('hover');
+  });
+  dz.addEventListener('dragleave', e => dz.classList.remove('hover'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('hover');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  // sync slider label
+  const slider = document.getElementById('threshold');
+  const label  = document.getElementById('thresholdValue');
+  slider.oninput = () => label.textContent = parseFloat(slider.value).toFixed(2);
+
+  // wait for OpenCV
+  cv['onRuntimeInitialized'] = () => {
+    // load logo template
+    let logoSrc = cv.imread('logo.png'); // ensure logo.png is hosted alongside
+    cv.cvtColor(logoSrc, logoSrc, cv.COLOR_RGBA2GRAY);
+
+    window.handleFiles = async files => {
+      const germanDiv = document.getElementById('german');
+      const logoDiv   = document.getElementById('logo');
+      germanDiv.innerHTML = ''; logoDiv.innerHTML = '';
+      const thresh = parseFloat(slider.value);
+
+      for (let f of files) {
+        if (!f.name.match(/\.jpe?g$/i)) continue;
+        const img = await fileToImage(f);
+        // OCR
+        const { data:{ text='' } } = await Tesseract.recognize(img, 'eng');
+        const lang = franc(text);
+        // logo match
+        let src = cv.imread(img);
+        cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY);
+        let res = new cv.Mat();
+        cv.matchTemplate(src, logoSrc, res, cv.TM_CCOEFF_NORMED);
+        let { maxVal } = cv.minMaxLoc(res);
+        res.delete(); src.delete();
+
+        const thumb = document.createElement('img');
+        thumb.src = URL.createObjectURL(f);
+        thumb.width = 100;
+
+        if (lang==='deu') germanDiv.appendChild(thumb);
+        else if (maxVal >= thresh) logoDiv.appendChild(thumb);
+      }
+    };
+  };
+
+  function fileToImage(file){
+    return new Promise(r => {
+      const img = new Image();
+      img.onload = () => r(img);
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  </script>
+</body>
+</html>
